@@ -47,22 +47,12 @@ news2/
 ├── app/                    # Next.js App Router
 │   ├── page.jsx           # 메인 페이지
 │   ├── admin/             # 관리자 전용 페이지
-│   │   ├── page.jsx       # 관리자 대시보드
-│   │   └── newsletter/    # 관리자 뉴스레터 관리
-│   │       ├── dashboard/ # 뉴스레터 대시보드
-│   │       ├── template/  # 뉴스레터 템플릿
-│   │       └── settings/  # 뉴스레터 설정
 │   ├── user/              # 사용자 전용 페이지
-│   │   ├── page.jsx       # 사용자 대시보드
-│   │   └── newsletter/    # 사용자 뉴스레터 관리
 │   ├── login/             # 로그인 페이지
 │   ├── unauthorized/      # 권한 없음 페이지
 │   ├── community/         # 커뮤니티 페이지
 │   ├── newsletter/        # 뉴스레터 페이지
 │   ├── mypage/           # 마이페이지
-│   ├── news/             # 뉴스 상세 페이지
-│   ├── auth/             # 회원가입/소셜인증
-│   ├── forgot-password/  # 비밀번호 찾기
 │   └── globals.css       # 전역 스타일
 ├── components/            # 재사용 가능한 컴포넌트
 │   ├── ui/               # 기본 UI 컴포넌트
