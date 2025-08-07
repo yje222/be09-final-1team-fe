@@ -1,17 +1,30 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Mail, CheckCircle, AlertCircle, PartyPopper } from 'lucide-react'
+import { getApiUrl } from '@/lib/config'
 
 export default function SubscribeForm({ onSubscribeSuccess }) {
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [showCelebration, setShowCelebration] = useState(false)
+  const [showRedirectMessage, setShowRedirectMessage] = useState(false)
+  const [isSubscribed, setIsSubscribed] = useState(false)
+
+  // 컴포넌트 마운트 시 localStorage에서 구독 상태 확인
+  useEffect(() => {
+    const stored = localStorage.getItem('subscribed')
+    if (stored === 'true') {
+      setIsSubscribed(true)
+    }
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -19,7 +32,7 @@ export default function SubscribeForm({ onSubscribeSuccess }) {
     setIsLoading(true)
     
     try {
-      const res = await fetch('/api/subscribe', {
+      const res = await fetch(getApiUrl('subscribe'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -31,18 +44,33 @@ export default function SubscribeForm({ onSubscribeSuccess }) {
       
       if (res.ok) {
         setSuccess(true)
+        setIsSubscribed(true)
         setEmail('')
         setShowCelebration(true)
+        setShowRedirectMessage(true)
+        
+        // localStorage에 구독 상태 저장
+        localStorage.setItem('subscribed', 'true')
         
         // 축하 애니메이션 3초 후 제거
         setTimeout(() => {
           setShowCelebration(false)
         }, 3000)
         
+        // 안내 메시지 2초 후 제거
+        setTimeout(() => {
+          setShowRedirectMessage(false)
+        }, 2000)
+        
         // 부모 컴포넌트에 구독 성공 알림
         if (onSubscribeSuccess) {
           onSubscribeSuccess(email)
         }
+        
+        // 3초 후 뉴스레터 대시보드로 자동 이동
+        setTimeout(() => {
+          router.push('/newsletter/dashboard')
+        }, 3000)
       } else {
         setError(data.message || '구독에 실패했습니다. 다시 시도해주세요.')
       }
@@ -54,9 +82,15 @@ export default function SubscribeForm({ onSubscribeSuccess }) {
   }
 
   const resetForm = () => {
-    setSuccess(false)
+    setSuccess(false) // ✔️ 완료 메시지 숨기기
     setError('')
     setShowCelebration(false)
+    setShowRedirectMessage(false)
+  }
+
+  // 구독한 사용자에게는 카드가 보이지 않음
+  if (isSubscribed) {
+    return null
   }
 
   if (success) {
@@ -77,6 +111,11 @@ export default function SubscribeForm({ onSubscribeSuccess }) {
           <p className="text-sm text-green-600 mt-1">
             매일 아침 엄선된 뉴스를 이메일로 받아보실 수 있습니다.
           </p>
+          {showRedirectMessage && (
+            <p className="text-xs text-blue-600 mt-2 animate-fade-in">
+              잠시 후 뉴스레터 대시보드로 이동합니다...
+            </p>
+          )}
           <Button 
             variant="outline" 
             size="sm" 

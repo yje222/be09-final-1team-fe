@@ -7,10 +7,12 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Mail, Clock, Users, Star, TrendingUp, Bell, Zap, Filter, CheckCircle, AlertCircle } from "lucide-react"
+import { Mail, Clock, Users, Star, TrendingUp, Bell, Zap, Filter, CheckCircle, AlertCircle, ArrowRight, User } from "lucide-react"
 import Header from "@/components/header"
 import { TextWithTooltips } from "@/components/tooltip"
 import { useToast } from "@/hooks/use-toast"
+import Link from "next/link"
+import { getUserRole } from "@/lib/auth"
 
 export default function NewsletterPage() {
   const [selectedCategory, setSelectedCategory] = useState("전체")
@@ -19,14 +21,21 @@ export default function NewsletterPage() {
   const [isSubscribing, setIsSubscribing] = useState(false)
   const [showEmailModal, setShowEmailModal] = useState(false)
   const [pendingNewsletterId, setPendingNewsletterId] = useState(null)
+  const [userRole, setUserRole] = useState(null)
   const { toast } = useToast()
 
   useEffect(() => {
     setIsLoaded(true)
-    // 로컬 스토리지에서 구독 정보 복원
-    const savedSubscriptions = localStorage.getItem('newsletterSubscriptions')
-    if (savedSubscriptions) {
-      setSubscribedNewsletters(JSON.parse(savedSubscriptions))
+    // 사용자 역할 확인
+    const role = getUserRole()
+    setUserRole(role)
+    
+    // 로그인한 사용자인 경우에만 로컬 스토리지에서 구독 정보 복원
+    if (role) {
+      const savedSubscriptions = localStorage.getItem('newsletterSubscriptions')
+      if (savedSubscriptions) {
+        setSubscribedNewsletters(JSON.parse(savedSubscriptions))
+      }
     }
   }, [])
 
@@ -79,17 +88,6 @@ export default function NewsletterPage() {
     },
     {
       id: 5,
-      title: "스포츠 하이라이트",
-      description: "주요 스포츠 이벤트와 선수들의 활약을 요약해드립니다",
-      category: "스포츠",
-      subscribers: 9870,
-      frequency: "매일",
-      lastSent: "4시간 전",
-      isSubscribed: false,
-      tags: ["스포츠", "경기", "선수"]
-    },
-    {
-      id: 6,
       title: "문화 & 라이프스타일",
       description: "문화, 예술, 라이프스타일 관련 트렌드를 소개합니다",
       category: "문화",
@@ -102,12 +100,14 @@ export default function NewsletterPage() {
   ]
 
   const [subscribedNewsletters, setSubscribedNewsletters] = useState(
-    newsletters.filter(nl => nl.isSubscribed)
+    userRole ? newsletters.filter(nl => nl.isSubscribed) : []
   )
 
   // 구독 정보를 로컬 스토리지에 저장
   const saveSubscriptions = (subscriptions) => {
-    localStorage.setItem('newsletterSubscriptions', JSON.stringify(subscriptions))
+    if (userRole) {
+      localStorage.setItem('newsletterSubscriptions', JSON.stringify(subscriptions))
+    }
   }
 
   // 이메일 유효성 검사
@@ -117,6 +117,16 @@ export default function NewsletterPage() {
   }
 
   const handleSubscribe = async (newsletterId) => {
+    if (!userRole) {
+      toast({
+        title: "로그인이 필요합니다",
+        description: "뉴스레터를 구독하려면 먼저 로그인해주세요.",
+        variant: "destructive",
+        icon: <AlertCircle className="h-4 w-4 text-red-500" />
+      })
+      return
+    }
+
     const newsletter = newsletters.find(nl => nl.id === newsletterId)
     const isCurrentlySubscribed = subscribedNewsletters.some(nl => nl.id === newsletterId)
 
@@ -179,6 +189,11 @@ export default function NewsletterPage() {
       setEmail("")
       setShowEmailModal(false)
       setPendingNewsletterId(null)
+      
+      // 구독 완료 후 마이페이지 설정 탭으로 이동
+      setTimeout(() => {
+        window.location.href = "/mypage?tab=settings"
+      }, 2000)
     } catch (error) {
       toast({
         title: "구독 실패",
@@ -237,16 +252,22 @@ export default function NewsletterPage() {
               </div>
               {/* 필터링 결과 표시 */}
               <div className="mt-2 text-sm text-gray-500">
-                {selectedCategory === "전체" 
-                  ? `전체 ${newsletters.length}개의 뉴스레터`
-                  : `${selectedCategory} 카테고리 ${filteredNewsletters.length}개의 뉴스레터`
-                }
+                {(() => {
+                  const availableNewsletters = filteredNewsletters.filter(
+                    newsletter => !subscribedNewsletters.some(sub => sub.id === newsletter.id)
+                  )
+                  return selectedCategory === "전체" 
+                    ? `전체 ${availableNewsletters.length}개의 구독 가능한 뉴스레터`
+                    : `${selectedCategory} 카테고리 ${availableNewsletters.length}개의 구독 가능한 뉴스레터`
+                })()}
               </div>
             </div>
 
             {/* Newsletter Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {filteredNewsletters.map((newsletter, index) => (
+              {filteredNewsletters
+                .filter(newsletter => !subscribedNewsletters.some(sub => sub.id === newsletter.id))
+                .map((newsletter, index) => (
                 <Card 
                   key={newsletter.id} 
                   className={`glass hover-lift animate-slide-in ${
@@ -331,80 +352,158 @@ export default function NewsletterPage() {
                   </Button>
                 </div>
               )}
+
+              {/* 구독한 뉴스레터가 모두 숨겨져서 표시할 뉴스레터가 없을 때 */}
+              {filteredNewsletters.length > 0 && 
+               filteredNewsletters.filter(newsletter => !subscribedNewsletters.some(sub => sub.id === newsletter.id)).length === 0 && (
+                <div className="col-span-2 text-center py-12">
+                  <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    이미 모든 뉴스레터를 구독하셨습니다!
+                  </h3>
+                  <p className="text-gray-500 mb-4">
+                    {selectedCategory === "전체" 
+                      ? "현재 표시 가능한 모든 뉴스레터를 구독하고 계십니다."
+                      : `${selectedCategory} 카테고리의 모든 뉴스레터를 구독하고 계십니다.`
+                    }
+                  </p>
+                  <div className="flex space-x-2 justify-center">
+                    <Link href="/mypage">
+                      <Button variant="outline" className="hover-lift">
+                        마이페이지에서 관리
+                      </Button>
+                    </Link>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setSelectedCategory("전체")}
+                      className="hover-lift"
+                    >
+                      다른 카테고리 보기
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Sidebar */}
           <div className="lg:col-span-1">
             <div className="space-y-6">
-              {/* My Subscriptions */}
-              <Card className="glass hover-lift animate-slide-in" style={{ animationDelay: '0.3s' }}>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center">
-                    <Bell className="h-5 w-5 mr-2 text-blue-500" />
-                    내 구독
-                  </CardTitle>
-                  <CardDescription>
-                    현재 구독 중인 뉴스레터 ({subscribedNewsletters.length}개)
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {subscribedNewsletters.map((newsletter) => (
-                      <div key={newsletter.id} className="flex items-center justify-between p-3 bg-white/50 rounded-lg hover:bg-white/70 transition-all duration-300">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-sm">
-                            <TextWithTooltips text={newsletter.title} />
-                          </h4>
-                          <p className="text-xs text-gray-500">{newsletter.frequency}</p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleSubscribe(newsletter.id)}
-                          className="hover-glow"
-                        >
-                          구독해제
-                        </Button>
+              {/* My Subscriptions - 로그인한 사용자만 표시 */}
+              {userRole && (
+                <Card className="glass hover-lift animate-slide-in" style={{ animationDelay: '0.3s' }}>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center justify-between">
+                      <div className="flex items-center">
+                        <Bell className="h-5 w-5 mr-2 text-blue-500" />
+                        내 구독
                       </div>
-                    ))}
-                    {subscribedNewsletters.length === 0 && (
-                      <p className="text-sm text-gray-500 text-center py-4">
-                        구독 중인 뉴스레터가 없습니다
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                      <Link 
+                        href="/newsletter/dashboard" 
+                        className="text-sm text-blue-600 hover:text-blue-800 transition-colors flex items-center"
+                      >
+                        대시보드
+                        <ArrowRight className="h-3 w-3 ml-1" />
+                      </Link>
+                    </CardTitle>
+                    <CardDescription>
+                      현재 구독 중인 뉴스레터 ({subscribedNewsletters.length}개)
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {subscribedNewsletters.map((newsletter) => (
+                        <div key={newsletter.id} className="flex items-center justify-between p-3 bg-white/50 rounded-lg hover:bg-white/70 transition-all duration-300">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-sm">
+                              <TextWithTooltips text={newsletter.title} />
+                            </h4>
+                            <p className="text-xs text-gray-500">{newsletter.frequency}</p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleSubscribe(newsletter.id)}
+                            className="hover-glow"
+                          >
+                            구독해제
+                          </Button>
+                        </div>
+                      ))}
+                      {subscribedNewsletters.length === 0 && (
+                        <div className="text-center py-4">
+                          <p className="text-sm text-gray-500 mb-3">
+                            구독 중인 뉴스레터가 없습니다
+                          </p>
+                          <Link href="/newsletter/dashboard">
+                            <Button variant="outline" size="sm" className="hover-lift">
+                              구독 대시보드 보기
+                            </Button>
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
-              {/* Newsletter Preferences */}
-              <Card className="glass hover-lift animate-slide-in" style={{ animationDelay: '0.4s' }}>
-                <CardHeader>
-                  <CardTitle className="text-lg">알림 설정</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="email-notifications" className="text-sm">
-                        이메일 알림
-                      </Label>
-                      <Switch id="email-notifications" defaultChecked />
+              {/* 로그인하지 않은 사용자를 위한 로그인 안내 */}
+              {!userRole && (
+                <Card className="glass hover-lift animate-slide-in" style={{ animationDelay: '0.3s' }}>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center">
+                      <User className="h-5 w-5 mr-2 text-gray-500" />
+                      로그인 필요
+                    </CardTitle>
+                    <CardDescription>
+                      뉴스레터 구독을 위해 로그인해주세요
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-center py-4">
+                      <p className="text-sm text-gray-500 mb-3">
+                        뉴스레터를 구독하고 관리하려면 로그인이 필요합니다.
+                      </p>
+                      <Link href="/auth">
+                        <Button className="w-full hover-lift">
+                          로그인하기
+                        </Button>
+                      </Link>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="push-notifications" className="text-sm">
-                        푸시 알림
-                      </Label>
-                      <Switch id="push-notifications" defaultChecked />
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Newsletter Preferences - 로그인한 사용자만 표시 */}
+              {userRole && (
+                <Card className="glass hover-lift animate-slide-in" style={{ animationDelay: '0.4s' }}>
+                  <CardHeader>
+                    <CardTitle className="text-lg">알림 설정</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="email-notifications" className="text-sm">
+                          이메일 알림
+                        </Label>
+                        <Switch id="email-notifications" defaultChecked />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="push-notifications" className="text-sm">
+                          푸시 알림
+                        </Label>
+                        <Switch id="push-notifications" defaultChecked />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="weekly-digest" className="text-sm">
+                          주간 요약
+                        </Label>
+                        <Switch id="weekly-digest" />
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="weekly-digest" className="text-sm">
-                        주간 요약
-                      </Label>
-                      <Switch id="weekly-digest" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Popular Newsletters */}
               <Card className="glass hover-lift animate-slide-in" style={{ animationDelay: '0.5s' }}>
