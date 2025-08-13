@@ -12,10 +12,61 @@ import Header from "@/components/header"
 import { TextWithTooltips } from "@/components/tooltip"
 import WeatherWidget from "@/components/WeatherWidget"
 import { newsService } from "@/lib/newsService"
-import SubscribeForm from "@/components/SubscribeForm"
-import SubscriberCount from "@/components/SubscriberCount"
+
 import { getUserRole } from "@/lib/auth"
 import RealTimeKeywordWidget from "@/components/RealTimeKeywordWidget"
+
+// 더미 데이터 생성 함수
+const generateDummyNews = () => {
+  const categories = ["POLITICS", "ECONOMY", "SOCIETY", "LIFE", "INTERNATIONAL", "IT_SCIENCE", "VEHICLE", "TRAVEL_FOOD", "ART"]
+  const sources = ["조선일보", "중앙일보", "동아일보", "한겨레", "경향신문", "한국일보", "서울신문", "매일경제", "한국경제", "이데일리"]
+  const titles = [
+    "정부, 새로운 경제 정책 발표... 시장 반응 주목",
+    "IT 업계 혁신 기술 도입으로 산업 구조 변화 예상",
+    "국제 무역 협정 체결로 경제 성장 기대감 고조",
+    "사회 복지 정책 개선안 발표, 시민들 반응 엇갈려",
+    "기후 변화 대응을 위한 글로벌 협력 강화",
+    "자동차 산업 전기차 시장 점유율 급상승",
+    "여행업계 회복세, 해외 관광객 증가세 지속",
+    "문화 예술계 디지털 전환 가속화",
+    "교육 시스템 개혁안 발표, 학부모들 관심 집중",
+    "의료 기술 발전으로 치료 효과 향상",
+    "부동산 시장 안정화 정책 효과 나타나",
+    "금융권 디지털 혁신 가속화",
+    "스포츠계 새로운 스타 탄생",
+    "환경 보호 운동 확산",
+    "과학 기술 연구 성과 발표",
+    "문화 유산 보존 활동 강화",
+    "국제 관계 개선 노력 지속",
+    "사회 문제 해결을 위한 민관 협력",
+    "생활 문화 변화 추세",
+    "미래 산업 육성 정책 발표"
+  ]
+  
+  const dummyNews = []
+  
+  for (let i = 1; i <= 200; i++) {
+    const category = categories[Math.floor(Math.random() * categories.length)]
+    const source = sources[Math.floor(Math.random() * sources.length)]
+    const title = titles[Math.floor(Math.random() * titles.length)]
+    const views = Math.floor(Math.random() * 10000) + 100
+    const publishedAt = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000) // 최근 30일 내
+    
+    dummyNews.push({
+      id: i,
+      title: `${title} - ${i}번째 뉴스`,
+      content: `이것은 ${category} 카테고리의 ${i}번째 뉴스 기사입니다. 다양한 정보와 분석을 제공합니다.`,
+      category: category,
+      source: source,
+      image: `/placeholder.svg?height=300&width=500&text=${encodeURIComponent(category)}`,
+      publishedAt: publishedAt.toISOString(),
+      views: views,
+      url: `https://example.com/news/${i}`
+    })
+  }
+  
+  return dummyNews
+}
 
 export default function MainPage() {
   const [selectedCategory, setSelectedCategory] = useState("전체")
@@ -24,19 +75,44 @@ export default function MainPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalElements, setTotalElements] = useState(0)
+  const [newsItems, setNewsItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [dummyNewsData] = useState(generateDummyNews())
 
+  // 페이지당 아이템 수
+  const itemsPerPage = 21
+
+  // 카테고리별 필터링 및 페이지네이션
   useEffect(() => {
     const fetchNews = async () => {
-      console.log('🔄 뉴스 데이터 로딩 시작...')
+      console.log('🔄 뉴스 데이터 로딩 시작...', { selectedCategory, currentPage })
+      setLoading(true)
+      
       try {
-        const data = await newsService.getAllNews({ page: currentPage, size: 21 })
-        console.log('✅ 뉴스 데이터 로딩 성공:', data.content?.length || 0, '개')
-        console.log('📰 첫 번째 뉴스:', data.content?.[0])
-        setNewsItems(data.content || [])
-        setTotalPages(data.totalPages || 1)
-        setTotalElements(data.totalElements || 0)
+        // 더미 데이터에서 카테고리별 필터링
+        let filteredData = dummyNewsData
+        if (selectedCategory !== "전체") {
+          filteredData = dummyNewsData.filter(news => news.category === selectedCategory)
+        }
+        
+        // 총 아이템 수와 페이지 수 계산
+        const totalItems = filteredData.length
+        const totalPagesCount = Math.ceil(totalItems / itemsPerPage)
+        
+        // 현재 페이지에 해당하는 데이터 추출
+        const startIndex = (currentPage - 1) * itemsPerPage
+        const endIndex = startIndex + itemsPerPage
+        const currentPageData = filteredData.slice(startIndex, endIndex)
+        
+        console.log('✅ 뉴스 데이터 로딩 성공:', selectedCategory, currentPageData.length, '개')
+        setNewsItems(currentPageData)
+        setTotalPages(totalPagesCount)
+        setTotalElements(totalItems)
       } catch (error) {
         console.error('❌ 뉴스 데이터 로딩 실패:', error)
+        setNewsItems([])
+        setTotalPages(1)
+        setTotalElements(0)
       } finally {
         setLoading(false)
         setIsLoaded(true)
@@ -45,33 +121,16 @@ export default function MainPage() {
 
     fetchNews()
     setUserRole(getUserRole())
-  }, [currentPage])
+  }, [currentPage, selectedCategory, dummyNewsData])
 
-  // 카테고리 변경 시 백엔드 API 호출
+  // 카테고리 변경 시 첫 페이지로 리셋
   useEffect(() => {
-    const fetchNewsByCategory = async () => {
-      console.log('🔄 카테고리별 뉴스 로딩 시작:', selectedCategory)
-      setLoading(true)
-      setCurrentPage(1) // 카테고리 변경 시 첫 페이지로 리셋
-      try {
-        const data = await newsService.getNewsByCategory(selectedCategory, { page: 1, size: 21 })
-        console.log('✅ 카테고리별 뉴스 로딩 성공:', selectedCategory, data.content?.length || 0, '개')
-        setNewsItems(data.content || [])
-        setTotalPages(data.totalPages || 1)
-        setTotalElements(data.totalElements || 0)
-      } catch (error) {
-        console.error('❌ 카테고리별 뉴스 로딩 실패:', selectedCategory, error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     if (isLoaded) {
-      fetchNewsByCategory()
+      setCurrentPage(1)
     }
   }, [selectedCategory, isLoaded])
 
-  const categories = ["전체", "POLITICS", "ECONOMY", "SOCIETY", "CULTURE", "IT_SCIENCE", "INTERNATIONAL"]
+  const categories = ["전체", "POLITICS", "ECONOMY", "SOCIETY", "LIFE", "INTERNATIONAL", "IT_SCIENCE", "VEHICLE", "TRAVEL_FOOD", "ART"]
   
   // 카테고리 표시명 매핑
   const categoryDisplayNames = {
@@ -79,12 +138,13 @@ export default function MainPage() {
     "POLITICS": "정치",
     "ECONOMY": "경제", 
     "SOCIETY": "사회",
-    "CULTURE": "문화",
+    "LIFE": "생활",
+    "INTERNATIONAL": "세계",
     "IT_SCIENCE": "IT/과학",
-    "INTERNATIONAL": "세계"
+    "VEHICLE": "자동차/교통",
+    "TRAVEL_FOOD": "여행/음식",
+    "ART": "예술",
   }
-  const [newsItems, setNewsItems] = useState([])
-  const [loading, setLoading] = useState(true)
 
   // 백엔드 API에서 이미 필터링된 데이터를 사용하므로 그대로 반환
   const filteredNewsItems = newsItems
@@ -114,21 +174,20 @@ export default function MainPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-3">
-                                                {/* Category Tabs, Newsletter Subscription, and Real-time Keywords */}
+          {/* Category Tabs, Newsletter Subscription, and Real-time Keywords */}
             <div className="mb-2">
               {/* 카테고리 버튼과 뉴스레터 구독 */}
-              <div className="flex flex-col lg:flex-row items-start gap-2 mb-2">
+              <div className="grid grid-cols-12 gap-4 items-stretch mb-2">
                 {/* 왼쪽: 카테고리 버튼과 실시간 키워드 */}
-                <div className="flex flex-col gap-2">
-                  {/* 카테고리 버튼 */}
-                  <div className="lg:w-auto overflow-x-auto flex space-x-1 pb-0">
+                <div className="col-span-12 lg:col-span-8 flex flex-col gap-2 h-full">
+                  <div className="lg:w-full overflow-x-auto flex space-x-3 pb-0">
                     {categories.map((category, index) => (
                       <Button
                         key={category}
                         variant={selectedCategory === category ? "default" : "outline"}
-                        size="sm"
+                        size="default"
                         onClick={() => setSelectedCategory(category)}
-                        className={`whitespace-nowrap hover-lift ${
+                        className={`whitespace-nowrap hover-lift text-base px-4 py-2 ${
                           isLoaded ? 'animate-slide-in' : 'opacity-0'
                         }`}
                         style={{ animationDelay: `${index * 0.1}s` }}
@@ -144,25 +203,7 @@ export default function MainPage() {
                   </div>
                 </div>
 
-                {/* 오른쪽: 뉴스레터 구독 */}
-                <div className="lg:w-80">
-                  <Card className="glass hover-lift animate-slide-in shadow-lg border-0" style={{ animationDelay: '0.3s' }}>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-lg font-bold flex items-center text-gray-800">
-                        <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center mr-2">
-                          <Zap className="h-4 w-4 text-white" />
-                        </div>
-                        뉴스레터 구독
-                      </CardTitle>
-                      <CardDescription className="text-gray-600 text-sm">
-                        매일 아침 엄선된 뉴스를 받아보세요 · <SubscriberCount />
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <SubscribeForm compact={true} />
-                    </CardContent>
-                  </Card>
-                </div>
+            
               </div>
             </div>
 
@@ -260,27 +301,22 @@ export default function MainPage() {
                   className="block"
                 >
                 <Card
-                className={`min-h-[420px] max-h-[420px] flex flex-col justify-between glass hover-lift animate-slide-in cursor-pointer transition-all duration-300 hover:shadow-lg ${
+                className={`min-h-[500px] max-h-[500px] flex flex-col justify-between glass hover-lift animate-slide-in cursor-pointer transition-all duration-300 hover:shadow-lg ${
                   isLoaded ? 'opacity-100' : 'opacity-0'
                 }`}
                 style={{ animationDelay: `${(index + 1) * 0.2}s` }}
               >
                    {/* 이미지 영역 */}
-                  <div className="h-40 w-full relative">
+                  <div className="h-72 w-full relative">
                     <img
                       src={news.image || "/placeholder.svg"}
                       alt={news.title}
-                      className="w-full h-full object-cover rounded-t-lg"
+                      className="w-full h-72 object-cover rounded-lg"
                     />
-                    <div className="absolute top-2 left-2">
-                      <Badge className="bg-blue-600 text-white text-xs px-3 py-1 rounded-full shadow">
-                        {news.category}
-                      </Badge>
-                    </div>
                   </div>
                   
                   {/* 텍스트 영역 */}
-                  <div className="flex flex-col justify-between flex-1 px-4 py-3">
+                  <div className="flex flex-col justify-between flex-1 px-4 py-3 min-h-0">
                     {/* 카테고리 뱃지 */}
                     <div className="flex justify-between items-start mb-3">
                       <Badge className="bg-blue-600 text-white text-xs px-3 py-1 rounded-full shadow">
@@ -297,20 +333,17 @@ export default function MainPage() {
                       </span>
                     </div>
 
-                    {/* 제목과 요약 */}
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold mb-2 hover:text-blue-600 transition-colors line-clamp-2">
+                    {/* 제목 */}
+                    <div className="flex-1 mb-3 min-h-0">
+                      <h3 className="text-lg font-semibold hover:text-blue-600 transition-colors line-clamp-2 leading-relaxed">
                         <TextWithTooltips text={news.title} />
                       </h3>
-                      <p className="text-gray-600 text-sm line-clamp-3 flex-1">
-                        <TextWithTooltips text={news.summary} />
-                      </p>
                     </div>
 
                     {/* 하단 출처 + 버튼 */}
-                    <div className="flex items-center justify-between mt-4">
-                      <span className="text-sm text-gray-500">{news.source}</span>
-                      <div className="flex items-center space-x-4">
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                      <span className="text-sm text-gray-500 font-medium truncate mr-2">{news.source}</span>
+                      <div className="flex items-center space-x-2 flex-shrink-0">
                         <span className="text-sm text-gray-500 flex items-center">
                           <Eye className="h-4 w-4 mr-1" />
                           {news.views.toLocaleString()}
@@ -318,7 +351,7 @@ export default function MainPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="hover-glow"
+                          className="hover-glow p-1"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <Share2 className="h-4 w-4" />
@@ -326,7 +359,7 @@ export default function MainPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="hover-glow"
+                          className="hover-glow p-1"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <Bookmark className="h-4 w-4" />

@@ -8,11 +8,11 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Mail, Clock, Users, Star, TrendingUp, Bell, Zap, Filter, CheckCircle, AlertCircle, ArrowRight, User } from "lucide-react"
-import Header from "@/components/header"
 import { TextWithTooltips } from "@/components/tooltip"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import { getUserRole } from "@/lib/auth"
+import Header from "@/components/header"
 
 export default function NewsletterPage() {
   const [selectedCategory, setSelectedCategory] = useState("전체")
